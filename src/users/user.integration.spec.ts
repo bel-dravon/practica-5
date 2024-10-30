@@ -125,6 +125,24 @@ describe('Users Integration (UsersService)', () => {
     expect(usersEnBaseDatos.email).toEqual(userActualizado.email);
   });
 
+  it('Debería lanzar BadRequestException si el email ya existe', async () => {
+    await repository.save([
+      { name: 'User 1', email: 'Email1@gmail.com', password: 'Password 1' },
+      { name: 'User 2', email: 'Email2@gmail.com', password: 'Password 2' },
+    ]);
+    try {
+      await service.create({
+        name: 'Test user',
+        email: 'Email2@gmail.com',
+        password: 'Test password',
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error.message).toBe(`Email already exists`);
+      expect(error.getStatus()).toBe(400);
+    }
+  });
+
   it('Debería lanzar NotFoundException al no encontrar un usuario para modificar', async () => {
     const userInexistente = 999;
     try {
