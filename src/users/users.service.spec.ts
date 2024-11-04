@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { User } from './user.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { HttpException, BadRequestException, NotFoundException } from '@nestjs/common';
@@ -12,6 +12,7 @@ const mockUserRepository = () => ({
   findOneBy: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
+  exist: jest.fn(),
 });
 
 const mockUser = { id: 1, name: 'Test user', email: 'test@example.com', password: 'Test password' };
@@ -107,24 +108,52 @@ describe('UsersService', () => {
   it('should update a user', async () => {
     const updateUser = { ...mockUser, name: 'Test user', email: 'test@example.com' };
 
-    jest.spyOn(repository, 'update').mockResolvedValue({ affected: 1 } as any);
-    jest.spyOn(repository, 'findOneBy').mockResolvedValue(updateUser as User);
+    jest.spyOn(repository, 'findOneBy').mockResolvedValue(mockUser as User);
+    jest.spyOn(repository, 'exist').mockResolvedValue(false);
+    jest.spyOn(repository, 'save').mockResolvedValue(updateUser as User);
 
     const result = await service.update(1, {
-      name: 'Test user',
-      email: 'test@example.com',
+      name: 'Updated name',
+      email: 'updated@example.com',
     });
 
     expect(result).toEqual(updateUser);
-    expect(repository.update).toHaveBeenCalledWith(1, {
-      name: 'Test user',
-      email: 'test@example.com',
-    });
     expect(repository.findOneBy).toHaveBeenCalledWith({ id: 1 });
+    expect(repository.exist).toHaveBeenCalledWith({
+      where: {
+        email: 'updated@example.com',
+        id: Not(1),
+      },
+    });
+    expect(repository.save).toHaveBeenCalled();
+  });
+
+  it('should throw BadRequestException when updating with existing email', async () => {
+    jest.spyOn(repository, 'findOneBy').mockResolvedValue(mockUser as User);
+    jest.spyOn(repository, 'exist').mockResolvedValue(true);
+
+    try {
+      await service.update(1, {
+        name: 'Updated name',
+        email: 'existing@example.com',
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error.message).toBe('Email already exists');
+      expect(error.getStatus()).toBe(400);
+    }
+
+    expect(repository.findOneBy).toHaveBeenCalledWith({ id: 1 });
+    expect(repository.exist).toHaveBeenCalledWith({
+      where: {
+        email: 'existing@example.com',
+        id: Not(1),
+      },
+    });
   });
 
   it('should throw NotFoundException if the user to update does not exist', async () => {
-    jest.spyOn(repository, 'update').mockResolvedValue({ affected: 0 } as any);
+    jest.spyOn(repository, 'findOneBy').mockResolvedValue(null);
 
     try {
       await service.update(1, {
@@ -137,10 +166,7 @@ describe('UsersService', () => {
       expect(error.getStatus()).toBe(404);
     }
 
-    expect(repository.update).toHaveBeenCalledWith(1, {
-      name: 'Non-existing Note',
-      email: 'Non-existing Content',
-    });
+    expect(repository.findOneBy).toHaveBeenCalledWith({ id: 1 });
   });
 
   it('should remove a user', async () => {

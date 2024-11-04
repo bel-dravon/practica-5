@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './user.entity';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update.user.dto';
 
@@ -46,11 +46,26 @@ export class UsersService {
   }
 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
-    const updateResult = await this.usersRepository.update(id, updateUserDto);
-    if (updateResult.affected === 0) {
-      throw new NotFoundException(`User not found`);
+    const user = await this.usersRepository.findOneBy({ id });
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
-    return this.findOne(id);
+
+    if (updateUserDto.email) {
+      const emailExists = await this.usersRepository.exist({
+        where: {
+          email: updateUserDto.email,
+          id: Not(id),
+        },
+      });
+
+      if (emailExists) {
+        throw new BadRequestException('Email already exists');
+      }
+    }
+
+    Object.assign(user, updateUserDto);
+    return this.usersRepository.save(user);
   }
 
   async remove(id: number): Promise<void> {

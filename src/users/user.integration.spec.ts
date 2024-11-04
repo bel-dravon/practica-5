@@ -38,6 +38,7 @@ describe('Users Integration (UsersService)', () => {
   });
 
   it('Debería crear un nuevo usuario en la base de datos', async () => {
+    await repository.query('DELETE FROM user;');
     const nuevoUser = {
       name: 'Usuario de prueba',
       email: 'EmailPrueba@gmail.com',
@@ -58,6 +59,7 @@ describe('Users Integration (UsersService)', () => {
   });
 
   it('Debería lanzar BadRequestException si el email ya existe', async () => {
+    await repository.query('DELETE FROM user;');
     const existingUser = {
       name: 'Usuario Existente',
       email: 'test@email.com',
