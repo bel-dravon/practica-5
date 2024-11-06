@@ -39,9 +39,9 @@ describe('users Acceptance', () => {
     await app.close();
   });
 
-  /* afterEach(async () => {
-    await usersRepository.query('DELETE FORM user');
-  }); */
+  afterEach(async () => {
+    await usersRepository.query('DELETE FROM user');
+  });
 
   it('Debería craer un usuario y retornar la respuesta', async () => {
     const nuevoUser: CreateUserDto = {
@@ -62,6 +62,7 @@ describe('users Acceptance', () => {
       email: 'EmailPrueba@gmail.com',
       password: 'Password de prueba',
     };
+    await request(app.getHttpServer()).post('/users').send(nuevoUser);
     const respuestaCrear = await request(app.getHttpServer()).post('/users').send(nuevoUser);
     expect(respuestaCrear.status).toBe(400);
     expect(respuestaCrear.body.message).toEqual('Email already exists');
@@ -114,6 +115,12 @@ describe('users Acceptance', () => {
   });
 
   it('Debería lanzar BadRequestException si el email ya existe al actualizar', async () => {
+    const usuarioExistente = await usersRepository.save({
+      name: 'Usuario Existente',
+      email: 'email_existente@gmail.com',
+      password: 'Password1',
+    });
+
     const usuarioParaActualizar = await usersRepository.save({
       name: 'Usuario para Actualizar',
       email: 'email_actualizar@gmail.com',
